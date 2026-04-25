@@ -8,8 +8,8 @@
         "black-forest-labs/FLUX.1-schnell",
         "hf-audio/whisper-large-v3",
         "stabilityai/stable-diffusion-3-5-large",
-        "facebook/musicgen-small",
-        "depth-anything/Depth-Anything-V2-Small",
+        "ResembleAI/Chatterbox",
+        "not-lain/background-removal",
         "hysts/TRELLIS"
       ]
     }

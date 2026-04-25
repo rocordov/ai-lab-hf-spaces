@@ -22,18 +22,18 @@
       "outputs": ["image"]
     },
     {
-      "id": "facebook/musicgen-small",
-      "category": "audio-generation",
-      "description": "Meta MusicGen — text-to-music generation",
-      "inputs": ["text description", "duration"],
+      "id": "ResembleAI/Chatterbox",
+      "category": "text-to-speech",
+      "description": "Resemble AI Chatterbox — high-quality TTS with reference audio style cloning",
+      "inputs": ["text", "optional reference audio"],
       "outputs": ["audio file"]
     },
     {
-      "id": "depth-anything/Depth-Anything-V2-Small",
+      "id": "not-lain/background-removal",
       "category": "computer-vision",
-      "description": "Monocular depth estimation from any image",
+      "description": "Remove image background — returns subject on transparent PNG",
       "inputs": ["image"],
-      "outputs": ["depth map image"]
+      "outputs": ["image (transparent background)"]
     },
     {
       "id": "hysts/TRELLIS",
