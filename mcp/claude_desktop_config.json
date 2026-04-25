@@ -6,7 +6,7 @@
         "-y",
         "@evalstate/mcp-hfspace",
         "black-forest-labs/FLUX.1-schnell",
-        "openai/whisper-large-v3",
+        "hf-audio/whisper-large-v3",
         "stabilityai/stable-diffusion-3-5-large",
         "facebook/musicgen-small",
         "depth-anything/Depth-Anything-V2-Small",

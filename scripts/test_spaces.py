@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
 """
-Quick smoke-test for HuggingFace Spaces integrations.
+Smoke tests for HuggingFace Spaces integrations.
+
+Connectivity tests (no token needed) — verify we can reach each Space and
+introspect its API. These always run.
+
+Inference tests — actually call the Space. These require HF_TOKEN because
+free-tier Spaces rate-limit anonymous users aggressively.
 
 Usage:
     pip install gradio_client huggingface_hub
-    HF_TOKEN=hf_... python3 scripts/test_spaces.py   # token optional for public spaces
-
-Tests:
-    1. FLUX.1-schnell  — text-to-image
-    2. Whisper large v3 — speech-to-text (uses a public sample URL)
+    python3 scripts/test_spaces.py              # connectivity only
+    HF_TOKEN=hf_... python3 scripts/test_spaces.py  # full tests
 """
 
 from __future__ import annotations
@@ -31,93 +34,123 @@ except ImportError:
 
 # ── config ────────────────────────────────────────────────────────────────────
 HF_TOKEN: str | None = os.getenv("HF_TOKEN") or None
-TIMEOUT = 90  # seconds; MCP itself uses 60s, give the raw client a bit more
 
-FLUX_SPACE = "black-forest-labs/FLUX.1-schnell"
-WHISPER_SPACE = "openai/whisper-large-v3"
+# NOTE: use hf-audio/whisper-large-v3 (community Space), not openai/whisper-large-v3
+# (that slug is the model repo, not a public Space).
+FLUX_SPACE    = "black-forest-labs/FLUX.1-schnell"
+WHISPER_SPACE = "hf-audio/whisper-large-v3"
 
-# A ~3-second public LibriVox clip (public domain, no auth required)
-SAMPLE_AUDIO_URL = "https://upload.wikimedia.org/wikipedia/commons/1/1f/Dial_up_modem_noises.ogg"
+SAMPLE_AUDIO_URL = (
+    "https://upload.wikimedia.org/wikipedia/commons/1/1f/Dial_up_modem_noises.ogg"
+)
 
+SPACES_TO_PROBE = [
+    FLUX_SPACE,
+    WHISPER_SPACE,
+    "facebook/musicgen-small",
+    "depth-anything/Depth-Anything-V2-Small",
+]
 
-# ── helpers ───────────────────────────────────────────────────────────────────
+PASS = "\033[32m✓\033[0m"
+FAIL = "\033[31m✗\033[0m"
+SKIP = "\033[33m–\033[0m"
+
 
 def section(title: str) -> None:
-    print(f"\n{'─' * 60}")
+    print(f"\n{'─' * 64}")
     print(f"  {title}")
-    print('─' * 60)
+    print("─" * 64)
 
 
-def ok(msg: str) -> None:
-    print(f"  \033[32m✓\033[0m  {msg}")
-
-
-def fail(msg: str) -> None:
-    print(f"  \033[31m✗\033[0m  {msg}")
-
-
-# ── token check ───────────────────────────────────────────────────────────────
-
+# ── token / auth check ────────────────────────────────────────────────────────
 section("Environment")
 if HF_TOKEN:
-    ok(f"HF_TOKEN is set ({HF_TOKEN[:8]}...)")
+    print(f"  {PASS}  HF_TOKEN set ({HF_TOKEN[:8]}...)")
     if HF_HUB_OK:
         try:
-            api = HfApi(token=HF_TOKEN)
-            user = api.whoami()
-            ok(f"Authenticated as: {user['name']}")
+            user = HfApi(token=HF_TOKEN).whoami()
+            print(f"  {PASS}  Authenticated as: {user['name']}")
         except Exception as exc:
-            fail(f"Token validation failed: {exc}")
+            print(f"  {FAIL}  Token validation failed: {exc}")
 else:
-    print("  ℹ  HF_TOKEN not set — using public (rate-limited) access")
+    print(f"  {SKIP}  HF_TOKEN not set — inference tests will be skipped")
+    print("       Set HF_TOKEN to run the full suite (free token at hf.co/settings/tokens)")
 
 
-# ── Test 1: FLUX.1-schnell ────────────────────────────────────────────────────
+# ── connectivity tests ────────────────────────────────────────────────────────
+section("Connectivity — API introspection (no token needed)")
 
-section(f"Test 1 — Image Generation  ({FLUX_SPACE})")
-t0 = time.perf_counter()
-try:
-    client = Client(FLUX_SPACE, hf_token=HF_TOKEN, verbose=False)
-    result = client.predict(
-        prompt="a white cat sitting on a neon sign, synthwave aesthetic",
-        seed=42,
-        randomize_seed=False,
-        width=512,
-        height=512,
-        num_inference_steps=4,
-        api_name="/infer",
-    )
-    elapsed = time.perf_counter() - t0
-    # result is typically (image_path, seed_used)
-    img_path = result[0] if isinstance(result, (list, tuple)) else result
-    ok(f"Image generated in {elapsed:.1f}s  →  {img_path}")
-except Exception as exc:
-    elapsed = time.perf_counter() - t0
-    fail(f"FLUX call failed after {elapsed:.1f}s: {exc}")
+connectivity_ok: dict[str, bool] = {}
+for space_id in SPACES_TO_PROBE:
+    t0 = time.perf_counter()
+    try:
+        c = Client(space_id, token=HF_TOKEN, verbose=False)
+        endpoints = [ep for ep in c.endpoints if ep]
+        elapsed = time.perf_counter() - t0
+        print(f"  {PASS}  {space_id:<52}  {elapsed:.1f}s  endpoints={endpoints}")
+        connectivity_ok[space_id] = True
+    except Exception as exc:
+        elapsed = time.perf_counter() - t0
+        short = str(exc)[:80]
+        print(f"  {FAIL}  {space_id:<52}  {elapsed:.1f}s  {short}")
+        connectivity_ok[space_id] = False
 
 
-# ── Test 2: Whisper ───────────────────────────────────────────────────────────
+# ── inference tests (token required) ─────────────────────────────────────────
+section("Inference tests (require HF_TOKEN)")
 
-section(f"Test 2 — Speech-to-Text  ({WHISPER_SPACE})")
-t0 = time.perf_counter()
-try:
-    client = Client(WHISPER_SPACE, hf_token=HF_TOKEN, verbose=False)
-    result = client.predict(
-        inputs=handle_file(SAMPLE_AUDIO_URL),
-        task="transcribe",
-        api_name="/predict",
-    )
-    elapsed = time.perf_counter() - t0
-    text = result if isinstance(result, str) else str(result)
-    ok(f"Transcription in {elapsed:.1f}s  →  {text[:120]!r}")
-except Exception as exc:
-    elapsed = time.perf_counter() - t0
-    fail(f"Whisper call failed after {elapsed:.1f}s: {exc}")
+if not HF_TOKEN:
+    print(f"  {SKIP}  Skipped — set HF_TOKEN to enable")
+else:
+    # Test 1: FLUX.1-schnell
+    if connectivity_ok.get(FLUX_SPACE):
+        t0 = time.perf_counter()
+        try:
+            c = Client(FLUX_SPACE, token=HF_TOKEN, verbose=False)
+            result = c.predict(
+                prompt="a white cat sitting on a neon sign, synthwave",
+                seed=42,
+                randomize_seed=False,
+                width=512,
+                height=512,
+                num_inference_steps=4,
+                api_name="/infer",
+            )
+            elapsed = time.perf_counter() - t0
+            img = result[0] if isinstance(result, (list, tuple)) else result
+            img_path = img.get("path") if isinstance(img, dict) else img
+            print(f"  {PASS}  FLUX image  {elapsed:.1f}s  →  {img_path}")
+        except Exception as exc:
+            elapsed = time.perf_counter() - t0
+            print(f"  {FAIL}  FLUX failed after {elapsed:.1f}s: {exc}")
+    else:
+        print(f"  {SKIP}  FLUX (connectivity failed above)")
+
+    # Test 2: Whisper
+    if connectivity_ok.get(WHISPER_SPACE):
+        t0 = time.perf_counter()
+        try:
+            c = Client(WHISPER_SPACE, token=HF_TOKEN, verbose=False)
+            result = c.predict(
+                inputs=handle_file(SAMPLE_AUDIO_URL),
+                task="transcribe",
+                api_name="/transcribe",
+            )
+            elapsed = time.perf_counter() - t0
+            text = result if isinstance(result, str) else str(result)
+            print(f"  {PASS}  Whisper ASR  {elapsed:.1f}s  →  {text[:100]!r}")
+        except Exception as exc:
+            elapsed = time.perf_counter() - t0
+            print(f"  {FAIL}  Whisper failed after {elapsed:.1f}s: {exc}")
+    else:
+        print(f"  {SKIP}  Whisper (connectivity failed above)")
 
 
-# ── Summary ───────────────────────────────────────────────────────────────────
-
-section("Done")
-print("  Add HF_TOKEN to your shell profile to avoid rate-limit errors on public Spaces.")
-print("  Example:  export HF_TOKEN=hf_your_token_here")
+# ── summary ───────────────────────────────────────────────────────────────────
+section("Summary")
+ok_count = sum(connectivity_ok.values())
+total = len(connectivity_ok)
+print(f"  Connectivity: {ok_count}/{total} Spaces reachable")
+if not HF_TOKEN:
+    print("  Inference: skipped (set HF_TOKEN=hf_... to enable)")
 print()

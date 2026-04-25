@@ -8,9 +8,9 @@
       "outputs": ["image"]
     },
     {
-      "id": "openai/whisper-large-v3",
+      "id": "hf-audio/whisper-large-v3",
       "category": "speech-to-text",
-      "description": "OpenAI Whisper large v3 — state-of-the-art ASR",
+      "description": "Whisper large v3 — state-of-the-art ASR (community Space)",
       "inputs": ["audio file or URL"],
       "outputs": ["transcription text"]
     },

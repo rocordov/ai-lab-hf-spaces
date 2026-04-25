@@ -128,8 +128,7 @@ class HuggingFaceSpaceComponent(Component):
         try:
             client = Client(
                 space_id,
-                hf_token=hf_token,
-                download_files=True,
+                token=hf_token,
                 verbose=False,
             )
         except Exception as exc:
