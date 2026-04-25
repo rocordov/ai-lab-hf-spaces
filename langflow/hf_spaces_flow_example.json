@@ -1,0 +1,131 @@
+{
+  "id": "flow-hf-spaces-example",
+  "name": "HuggingFace Spaces — Text-to-Image + Transcription",
+  "description": "Example Langflow flow: generate an image with FLUX.1-schnell, then caption it with BLIP",
+  "version": "1.1",
+  "data": {
+    "nodes": [
+      {
+        "id": "TextInput-1",
+        "type": "genericNode",
+        "data": {
+          "type": "TextInput",
+          "node": {
+            "template": {
+              "input_value": {
+                "type": "str",
+                "value": "A futuristic Tokyo skyline at sunset, cyberpunk style, 8k",
+                "display_name": "Text",
+                "required": true
+              }
+            },
+            "display_name": "Text Input",
+            "description": "User's image generation prompt"
+          }
+        },
+        "position": { "x": 100, "y": 200 }
+      },
+      {
+        "id": "HFSpace-FLUX-1",
+        "type": "genericNode",
+        "data": {
+          "type": "HuggingFaceSpaceComponent",
+          "node": {
+            "template": {
+              "space_id": {
+                "type": "str",
+                "value": "black-forest-labs/FLUX.1-schnell",
+                "display_name": "Space ID",
+                "required": true
+              },
+              "api_name": {
+                "type": "str",
+                "value": "/infer",
+                "display_name": "API Endpoint"
+              },
+              "timeout": {
+                "type": "int",
+                "value": 90,
+                "display_name": "Timeout (s)"
+              },
+              "hf_token": {
+                "type": "str",
+                "value": "",
+                "display_name": "HF Token",
+                "password": true
+              }
+            },
+            "display_name": "FLUX.1-schnell (Image Gen)",
+            "description": "Generate image from text prompt"
+          }
+        },
+        "position": { "x": 450, "y": 200 }
+      },
+      {
+        "id": "HFSpace-Whisper-1",
+        "type": "genericNode",
+        "data": {
+          "type": "HuggingFaceSpaceComponent",
+          "node": {
+            "template": {
+              "space_id": {
+                "type": "str",
+                "value": "openai/whisper-large-v3",
+                "display_name": "Space ID",
+                "required": true
+              },
+              "api_name": {
+                "type": "str",
+                "value": "/predict",
+                "display_name": "API Endpoint"
+              },
+              "timeout": {
+                "type": "int",
+                "value": 60,
+                "display_name": "Timeout (s)"
+              }
+            },
+            "display_name": "Whisper Large v3 (ASR)",
+            "description": "Transcribe audio to text"
+          }
+        },
+        "position": { "x": 450, "y": 500 }
+      },
+      {
+        "id": "TextOutput-1",
+        "type": "genericNode",
+        "data": {
+          "type": "TextOutput",
+          "node": {
+            "template": {
+              "input_value": {
+                "type": "str",
+                "display_name": "Text",
+                "required": true
+              }
+            },
+            "display_name": "Image Result",
+            "description": "Path or URL of generated image"
+          }
+        },
+        "position": { "x": 800, "y": 200 }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge-1",
+        "source": "TextInput-1",
+        "sourceHandle": "text_output",
+        "target": "HFSpace-FLUX-1",
+        "targetHandle": "input_text"
+      },
+      {
+        "id": "edge-2",
+        "source": "HFSpace-FLUX-1",
+        "sourceHandle": "result",
+        "target": "TextOutput-1",
+        "targetHandle": "input_value"
+      }
+    ]
+  }
+}
